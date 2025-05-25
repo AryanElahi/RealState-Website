@@ -100,7 +100,6 @@ async function searchregion(data) {
     return user_announs;
 }
 
-
 module.exports = {
     creatAnnouncement,
     getAllAnnouns,
