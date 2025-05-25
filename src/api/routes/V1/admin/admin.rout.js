@@ -135,6 +135,8 @@ router.post("/uploadPhotos", verifyAccessToken, verifyadmin , async (req, res, n
                     message: 'file doesnt exist'
                 });
             }
+            console.log('Uploaded files:', req.files);
+
             const imageUrls = req.files.map(file => `http://185.231.115.236:3000/photos/${file.filename}`);
             try {
                 const adding = await photo_adding(req.body.Uid, imageUrls)
