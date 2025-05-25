@@ -73,11 +73,19 @@ async function getByUid (code) {
         }
     })
 }
-async function photo_adding (Uid, Url){
+async function photo_adding(Uid, newUrls) {
+    const existing = await prisma.property.findUnique({
+        where: { Uid },
+        select: { photo: true }
+    });
+
+    const currentPhotos = Array.isArray(existing.photo) ? existing.photo : [];
+    const updatedPhotos = [...currentPhotos, ...newUrls];
+
     return await prisma.property.update({
-    where: {Uid : Uid},
-    data : {photo : Url}
-    })
+        where: { Uid },
+        data: { photo: updatedPhotos }
+    });
 }
 async function checkAnnounce (ID, stateCode){
       const updated = await prisma.property.update({
