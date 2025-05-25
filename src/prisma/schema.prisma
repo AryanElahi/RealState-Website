@@ -61,7 +61,7 @@ model property{
   land_metrage Int @default(0)
   useful_metrage Int @default(0)
   floor_number Int @default(0)
-  floor Int @default(0)
+  floor String @default("")
   Unit_in_floor Int @default(0)
   year_of_build Int @default(0)
   full_name String @default("")
