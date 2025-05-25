@@ -49,7 +49,7 @@ async function deleteAnnoun (ID){
       })
     return (updated)
 }
-  async function search(data) {
+async function search(data) {
     const { full_name, ...rest } = data;
   
     const where = {
@@ -76,11 +76,29 @@ const announs = await prisma.property.findMany({
         id: 'desc'
     }
 });
-
     const count = announs.length
     return ({"confirmed": announs, "number": count})
 }
+async function searchregion(data) {
+    const { name, ...rest } = data;
   
+    const where = {
+      ...rest,
+      ...(name && {
+        name: {
+          contains: name,
+          mode: 'insensitive'
+        }
+        
+      })
+    };
+  
+    const user_announs = await prisma.region.findMany({
+      where
+    });
+  
+    return user_announs;
+}
 
 
 module.exports = {
@@ -92,5 +110,6 @@ module.exports = {
     getByUid,
     photo_adding,
     search,
-    confirmed
+    confirmed,
+    searchregion
 }

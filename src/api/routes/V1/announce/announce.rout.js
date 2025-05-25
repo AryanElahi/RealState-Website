@@ -13,7 +13,8 @@ const {
     confirmed,
     deleteAnnoun,
     photo_adding,
-    search
+    search,
+    searchregion
 } = require("../../../../services/anouncement/CRUD")
 const {getUserByAccessToken} = require ("./../../../../services/user/auth")
 const {verifyAccessToken} = require("../../../middlewares/isAuth.middleware")
@@ -123,6 +124,15 @@ router.get("/confirmed_announce", async (req, res, next) => {
     } 
     catch (error) {
         console.log(error)
+        next(createError(500, "An unexpected error occurred"));
+    }
+});
+router.post("/search_region", async (req, res, next) => {
+    try {
+        const result = await searchregion(req.body)
+        res.send(result)
+    } 
+    catch (error) {
         next(createError(500, "An unexpected error occurred"));
     }
 });
