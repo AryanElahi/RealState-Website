@@ -70,9 +70,13 @@ async function deleteAnnoun (ID){
     return user_announs;
 }
 async function confirmed() {
-    const announs = await prisma.property.findMany({
-        where : {check : true}
-    })
+const announs = await prisma.property.findMany({
+    where: { check: true },
+    orderBy: {
+        id: 'desc'
+    }
+});
+
     const count = announs.length
     return ({"confirmed": announs, "number": count})
 }
