@@ -10,7 +10,11 @@ async function creatannounce (data, userId){
     return newAnnoun
 }
 async function getAllAnnouns () {
-    const announs = await prisma.property.findMany()
+    const announs = await prisma.property.findMany({
+        orderBy: {
+            id: 'desc'
+        }
+    })
     const counter = announs.length
     return ({"announce": announs, "number": counter})
 }
