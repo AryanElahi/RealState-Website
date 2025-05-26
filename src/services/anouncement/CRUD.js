@@ -79,24 +79,16 @@ const announs = await prisma.property.findMany({
     const count = announs.length
     return ({"confirmed": announs, "number": count})
 }
-async function searchregion(data) {
-    const { name, ...rest } = data;
-  
-    const where = {
-      ...rest,
-      ...(name && {
-        name: {
-          contains: name,
-          mode: 'insensitive'
-        }
-        
-      })
-    };
-  
-    const user_announs = await prisma.region.findMany({
-      where
-    });
-  
+async function searchregion(name_e) {
+
+  const user_announs = await prisma.region.findMany({
+    where: {
+      name: {
+        contains: name_e,
+        mode: 'insensitive'
+      }
+    }
+  });
     return user_announs;
 }
 
