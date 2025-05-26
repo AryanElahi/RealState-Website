@@ -129,7 +129,7 @@ router.get("/confirmed_announce", async (req, res, next) => {
 });
 router.post("/search_region", async (req, res, next) => {
     try {
-        const result = await searchregion(req.body)
+        const result = await searchregion(req.body.name)
         res.send(result)
     } 
     catch (error) {
