@@ -19,7 +19,9 @@ const creat = joi.object ({
     price     : joi.number(),
     room_number  : joi.number(),
     features     : joi.string(),
-    description     : joi.string()
+    description     : joi.string(),
+    phone    :joi.string()
+    .pattern(RegExp("^(?:([0-9]{1})*[- .(]*([0-9]{3})[- .)]*[0-9]{3}[- .]*[0-9]{4})+$")),
 })
 const update = joi.object ({
     loan : joi.number(),

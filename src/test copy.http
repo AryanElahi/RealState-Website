@@ -1,2 +1,6 @@
-get http://185.231.115.236:3000/api/V1/announce/getallannounce
+post http://185.231.115.236:3000/api/V1/announce/search_region
 Content-Type: application/json
+
+{
+    "name": "مب"
+}
