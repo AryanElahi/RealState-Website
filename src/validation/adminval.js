@@ -13,7 +13,8 @@ const creatval = joi.object ({
     land_metrage : joi.number(),
     useful_metrage : joi.number(),
     floor_number : joi.number(),
-    floor : joi.number(),
+floor : joi.string(),
+
     Unit_in_floor : joi.number(),
     year_of_build : joi.number(),
     full_name : joi.string(),
@@ -40,7 +41,7 @@ const update = joi.object ({
     land_metrage : joi.number().optional(),
     useful_metrage : joi.number().optional(),
     floor_number : joi.number().optional(),
-    floor : joi.number().optional(),
+    floor : joi.string().optional(),
     Unit_in_floor : joi.number().optional(),
     year_of_build : joi.number().optional(),
     full_name : joi.string().optional(),
