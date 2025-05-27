@@ -12,14 +12,16 @@ const creat = joi.object ({
     land_metrage : joi.number(),
     useful_metrage : joi.number(),
     floor_number : joi.number(),
-    floor : joi.number(),
+    floor : joi.string(),
     Unit_in_floor : joi.number(),
     year_of_build : joi.number(),
     full_name : joi.string(),
     price     : joi.number(),
     room_number  : joi.number(),
     features     : joi.string(),
-    description     : joi.string()
+    description     : joi.string(),
+    phone    :joi.string()
+    .pattern(RegExp("^(?:([0-9]{1})*[- .(]*([0-9]{3})[- .)]*[0-9]{3}[- .]*[0-9]{4})+$")),
 })
 const update = joi.object ({
     loan : joi.number(),
@@ -32,7 +34,7 @@ const update = joi.object ({
     land_metrage : joi.number(),
     useful_metrage : joi.number(),
     floor_number : joi.number(),
-    floor : joi.number(),
+    floor : joi.string(),
     Unit_in_floor : joi.number(),
     year_of_build : joi.number(),
     full_name : joi.string(),
