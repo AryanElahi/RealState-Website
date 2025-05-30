@@ -51,7 +51,7 @@ const update = joi.object ({
     phone    :joi.string().optional()
     .pattern(RegExp("^(?:([0-9]{1})*[- .(]*([0-9]{3})[- .)]*[0-9]{3}[- .]*[0-9]{4})+$")),
     state_code:  joi.string().optional(),
-
+    description :  joi.string(),
 })
 module.exports = { 
     creatval,
