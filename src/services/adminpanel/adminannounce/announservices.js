@@ -59,7 +59,7 @@ async function search(data) {
     ...(address && {
       address: {
         contains: address,
-        mode: 'insensitive'
+        mode: 'sensitive'
       }
     }),
     ...(price && {
@@ -106,11 +106,8 @@ async function checkAnnounce (ID, stateCode){
     return (updated)
 }
 async function rejectAnnoun(ID){
-    const updated = await prisma.property.update({
-    where: {Uid: ID},
-    data : {reject : true}
-    })
-  return (updated)
+    const updated = await prisma.property.delete({
+    where: {Uid: ID}    })
 }
 
 module.exports = {
