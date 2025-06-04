@@ -50,24 +50,34 @@ async function deleteAnnoun (ID){
     return (updated)
 }
 async function search(data) {
-    const { full_name, ...rest } = data;
-  
-    const where = {
-      ...rest,
-      ...(full_name && {
-        full_name: {
-          contains: full_name,
-          mode: 'insensitive'
-        }
-        
-      })
-    };
-  
-    const user_announs = await prisma.property.findMany({
-      where
-    });
-  
-    return user_announs;
+  const { full_name, address, price, ...rest } = data;
+
+  const where = {
+    ...rest,
+    ...(full_name && {
+      full_name: {
+        contains: full_name,
+        mode: 'insensitive'
+      }
+    }),
+    ...(address && {
+      address: {
+        contains: address,
+        mode: 'insensitive'
+      }
+    }),
+    ...(price && {
+      price: {
+        lte: price
+      }
+    })
+  };
+
+  const user_announs = await prisma.property.findMany({
+    where
+  });
+
+  return user_announs;
 }
 async function confirmed() {
 const announs = await prisma.property.findMany({
@@ -81,7 +91,7 @@ const announs = await prisma.property.findMany({
 }
 async function searchregion(name_e) {
 
-  const user_announs = await prisma.region.findMany({
+const user_announs = await prisma.region.findMany({
     where: {
       name: {
         contains: name_e,
