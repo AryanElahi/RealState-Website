@@ -46,29 +46,34 @@ async function delete_photos (uid){
     })
 }
 async function search(data) {
-        const { full_name, address, ...rest } = data;
-      
-        const where = {
-          ...rest,
-          ...(full_name && {
-            full_name: {
-              contains: full_name,
-              mode: 'insensitive'
-            }
-          }),
-          ...(address && {
-            address: {
-              contains: address,
-              mode: 'insensitive'
-            }
-          })
-        };
-      
-        const user_announs = await prisma.property.findMany({
-          where
-        });
-      
-        return user_announs;
+  const { full_name, address, price, ...rest } = data;
+
+  const where = {
+    ...rest,
+    ...(full_name && {
+      full_name: {
+        contains: full_name,
+        mode: 'insensitive'
+      }
+    }),
+    ...(address && {
+      address: {
+        contains: address,
+        mode: 'insensitive'
+      }
+    }),
+    ...(price && {
+      price: {
+        lte: price
+      }
+    })
+  };
+
+  const user_announs = await prisma.property.findMany({
+    where
+  });
+
+  return user_announs;
 }
 async function getByUid (code) {
     return prisma.property.findUnique({
