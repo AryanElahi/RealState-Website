@@ -95,7 +95,7 @@ const user_announs = await prisma.region.findMany({
     where: {
       name: {
         contains: name_e,
-        mode: 'sensitive'
+        mode: 'insensitive'
       }
     }
   });
