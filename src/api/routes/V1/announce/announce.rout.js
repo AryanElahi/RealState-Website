@@ -133,6 +133,7 @@ router.post("/search_region", async (req, res, next) => {
         res.send(result)
     } 
     catch (error) {
+        console.log(error)
         next(createError(500, "An unexpected error occurred"));
     }
 });
