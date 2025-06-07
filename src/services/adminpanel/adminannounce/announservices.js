@@ -59,7 +59,7 @@ async function search(data) {
     ...(address && {
       address: {
         contains: address,
-        mode: 'sensitive'
+        mode: 'insensitive'
       }
     }),
     ...(price && {
