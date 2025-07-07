@@ -85,7 +85,7 @@ try {
     next(createError(500, "An unexpected error occurred"));
 }
 })
-router.get("/notconfirmedrequests", async (req, res, next) => {
+router.get("/notconfirmedrequests",verifyAccessToken, verifyadmin, async (req, res, next) => {
     try {
         const notconfirmed = await deleted_or_not_confirmed()
         res.send(notconfirmed)    } 
@@ -93,7 +93,7 @@ router.get("/notconfirmedrequests", async (req, res, next) => {
         next(createError(500, "An unexpected error occurred"));
     }
 });
-router.get("/getAllRequests", async (req, res, next) => {
+router.get("/getAllRequests",verifyAccessToken, verifyadmin, async (req, res, next) => {
     try {
     const requests = await getAll()
     res.send(requests)
