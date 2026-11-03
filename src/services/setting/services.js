@@ -1,35 +1,32 @@
-const {PrismaClient} = require("@prisma/client")
-const prisma = new PrismaClient()
+const prisma = require("../../loader/prisma");
 
-async function initiateSetting (data){
-    const newAnnoun = await prisma.setting.create({
-        data :
-            data    
-    })
-    return newAnnoun
+// The site settings live in a single row with id 1. upsert creates it the
+// first time instead of failing because the row does not exist yet.
+const SETTING_ID = 1;
+
+async function initiateSetting(data) {
+    return prisma.setting.upsert({
+        where: { id: SETTING_ID },
+        update: data,
+        create: { id: SETTING_ID, ...data },
+    });
 }
-async function logoAdding(Url){
-    return await prisma.setting.update({
-    where: {id : 1},
-    data : {logo : Url}
-    })
-    }
-async function aboutUpdating(data){
-    return await prisma.setting.update({
-        where: {id : 1},
-        data : {about : data.about,
-                goals : data.goals
-        }
-        })
-        }
-async function get_about(data){
-    return await prisma.setting.findFirst({
-            where: {id : 1}
-            })
-            }
+
+async function logoAdding(urls) {
+    return initiateSetting({ logo: urls });
+}
+
+async function aboutUpdating({ about, goals }) {
+    return initiateSetting({ about, goals });
+}
+
+async function get_about() {
+    return prisma.setting.findUnique({ where: { id: SETTING_ID } });
+}
+
 module.exports = {
     initiateSetting,
     logoAdding,
     aboutUpdating,
-    get_about
-}
+    get_about,
+};

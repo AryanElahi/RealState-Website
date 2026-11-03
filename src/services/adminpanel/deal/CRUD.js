@@ -1,33 +1,27 @@
-const {PrismaClient} = require("@prisma/client")
-const prisma = new PrismaClient()
-const createErrorrs = require ("http-errors")
+const prisma = require("../../../loader/prisma");
 
-async function creatdeal(data){
-    const newdeal = await prisma.deal.create({
-        data :
-            data    
-    })
-    return newdeal
+async function creatdeal(data) {
+    return prisma.deal.create({ data });
 }
+
 async function getAlldeals() {
-    return (await prisma.deal.findMany())
+    return prisma.deal.findMany({ orderBy: { id: "desc" } });
 }
-async function updatedeal(Uid, data){
-    return await prisma.deal.update({
-    where: {Uid : Uid},
-    data : data
-    })
-    }
-async function deletedeal (ID){
-      const updated = await prisma.deal.delete({
-      where: {Uid: ID}
-      })
-    return (updated)
-  }
+
+async function updatedeal(Uid, data) {
+    return prisma.deal.update({
+        where: { Uid },
+        data,
+    });
+}
+
+async function deletedeal(Uid) {
+    return prisma.deal.delete({ where: { Uid } });
+}
 
 module.exports = {
     creatdeal,
     getAlldeals,
     updatedeal,
-    deletedeal
-}
+    deletedeal,
+};

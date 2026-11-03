@@ -1,105 +1,78 @@
-const {PrismaClient} = require("@prisma/client")
-const prisma = new PrismaClient()
-const createErrors = require ("http-errors")
+const prisma = require("../../loader/prisma");
+const { buildWhere } = require("../../validation/search.validation");
 
+async function creatAnnouncement(data, userId) {
+    return prisma.property.create({
+        data: { ...data, userID: userId },
+    });
+}
 
-async function creatAnnouncement(data, userId){
-    data.userID = userId
-    const newAnnoun = await prisma.property.create({
-        data :
-            data    
-    })
-    return newAnnoun
+// Replaces the photos of an announcement.
+async function photo_adding(Uid, urls) {
+    return prisma.property.update({
+        where: { Uid },
+        data: { photo: urls },
+    });
 }
-async function photo_adding (Uid, Url){
-    return await prisma.property.update({
-    where: {Uid : Uid},
-    data : {photo : Url}
-    })
-}
-async function getByStateCode (code) {
+
+async function getByStateCode(code) {
     return prisma.property.findFirst({
-        where: {
-            state_code : code
-        }
-    })
+        where: { state_code: code },
+    });
 }
-async function getByUid (code) {
+
+async function getByUid(code) {
     return prisma.property.findUnique({
-        where: {
-            Uid : code
-        }
-    })
+        where: { Uid: code },
+    });
 }
-async function getAllAnnouns () {
-    return (await prisma.property.findMany({
-            where: {reject : false}
-}))
-}
-async function updateAnnoun (result){
-    const code = await getByUid(result.Uid)
-    return await prisma.property.update({
-    where: {Uid : code.Uid},
-    data : result
-    })
-}
-async function deleteAnnoun (ID){
-      const updated = await prisma.property.delete({
-      where: {Uid: ID}
-      })
-    return (updated)
-}
-async function search(data) {
-  const { full_name, address, price, ...rest } = data;
 
-  const where = {
-    ...rest,
-    ...(full_name && {
-      full_name: {
-        contains: full_name,
-        mode: 'insensitive'
-      }
-    }),
-    ...(address && {
-      address: {
-        contains: address,
-        mode: 'insensitive'
-      }
-    }),
-    ...(price && {
-      price: {
-        lte: price
-      }
-    })
-  };
-
-  const user_announs = await prisma.property.findMany({
-    where
-  });
-
-  return user_announs;
+// Public listing: only announcements approved by an admin.
+async function getAllAnnouns() {
+    return prisma.property.findMany({
+        where: { check: true, reject: false },
+        orderBy: { id: "desc" },
+    });
 }
+
+async function updateAnnoun({ Uid, ...data }) {
+    return prisma.property.update({
+        where: { Uid },
+        data,
+    });
+}
+
+async function deleteAnnoun(Uid) {
+    return prisma.property.delete({
+        where: { Uid },
+    });
+}
+
+// `filters` must come from search.validation (whitelisted fields only).
+async function search(filters) {
+    return prisma.property.findMany({
+        where: { ...buildWhere(filters), check: true, reject: false },
+        orderBy: { id: "desc" },
+    });
+}
+
 async function confirmed() {
-const announs = await prisma.property.findMany({
-    where: { check: true },
-    orderBy: {
-        id: 'desc'
-    }
-});
-    const count = announs.length
-    return ({"confirmed": announs, "number": count})
+    const announs = await prisma.property.findMany({
+        where: { check: true, reject: false },
+        orderBy: { id: "desc" },
+    });
+    return { confirmed: announs, number: announs.length };
 }
-async function searchregion(name_e) {
 
-const user_announs = await prisma.region.findMany({
-    where: {
-      name: {
-        contains: name_e,
-        mode: 'insensitive'
-      }
-    }
-  });
-    return user_announs;
+async function searchregion(name) {
+    return prisma.region.findMany({
+        where: {
+            name: {
+                contains: name,
+                mode: "insensitive",
+            },
+        },
+    });
 }
 
 module.exports = {
@@ -112,5 +85,5 @@ module.exports = {
     photo_adding,
     search,
     confirmed,
-    searchregion
-}
+    searchregion,
+};

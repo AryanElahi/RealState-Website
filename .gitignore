@@ -129,4 +129,10 @@ dist
 .yarn/install-state.gz
 .pnp.*
 .env
-/Users/aryaneuse/Desktop/zhingeh/src/prisma/migrations
+
+# macOS
+.DS_Store
+
+# Uploaded files
+photos/
+src/photos/

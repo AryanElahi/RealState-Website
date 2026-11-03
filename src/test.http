@@ -1,7 +1,24 @@
-post http://185.231.115.236:3000/api/V1/announce/search
+# Manual requests for the REST Client extension.
+# Put a token from /auth/login in @token. Never commit real tokens.
+@baseUrl = http://localhost:3000/api/V1
+@token = PASTE_ACCESS_TOKEN_HERE
+
+### Search confirmed announcements
+POST {{baseUrl}}/announce/search
 Content-Type: application/json
-Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpYXQiOjE3NDcxMTI2NDksImV4cCI6MTc3ODY3MDI0OSwiYXVkIjoiMDkxODE3MTE2OTAiLCJpc3MiOiJwaWNrdXJwYWdlLmNvbSJ9.INd8WcPFGz4M7Mqp9PNUrVeE_qGvSHEek4K3WO3di3c
 
 {
-    "id" : 1
+    "type": "sell"
 }
+
+### Search regions
+POST {{baseUrl}}/announce/search_region
+Content-Type: application/json
+
+{
+    "name": "مب"
+}
+
+### My announcements
+GET {{baseUrl}}/auth/getAnnouncements
+Authorization: Bearer {{token}}
