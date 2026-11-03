@@ -1,123 +1,146 @@
-const express = require("express")
-const {PrismaClient} = require("@prisma/client")
-const prisma = new PrismaClient()
-const bcrypt = require("bcrypt") 
-const JWT = require("jsonwebtoken")
-const createErrors = require ("http-errors")
-const { client, connectRedis, disconnectRedis } = require("./../../loader/redis")
-require("dotenv").config()
+const bcrypt = require("bcrypt");
+const JWT = require("jsonwebtoken");
+const createError = require("http-errors");
+const prisma = require("../../loader/prisma");
+const { client } = require("../../loader/redis");
+const config = require("../../config");
+const { omitPassword } = require("../../utils/sanitize");
+
+const BCRYPT_ROUNDS = 10;
+const refreshKey = (phone) => `refresh:${phone}`;
 
 async function doesExistphone(phone) {
-const Exist = await prisma.user.findUnique({
-    where: {
-        phone: phone
-    }
-    })
-    if (Exist) return (true)
-    if (!Exist) return (false)
+    const exist = await prisma.user.findUnique({ where: { phone } });
+    return Boolean(exist);
 }
-async function hashPassword (pass) {
-    const salt = await bcrypt.genSalt(10)
-    let hashedpass = await bcrypt.hash(pass, salt)
-    return (hashedpass)
+
+async function hashPassword(pass) {
+    return bcrypt.hash(pass, BCRYPT_ROUNDS);
 }
-async function creatUser (data){
-    const newuser =await prisma.user.create({
-        data :
-            data           
-    })
-    return newuser
+
+async function isValid(pass, hashed) {
+    if (!pass || !hashed) return false;
+    return bcrypt.compare(pass, hashed);
 }
+
+async function creatUser(data) {
+    const newuser = await prisma.user.create({ data });
+    return omitPassword(newuser);
+}
+
 async function userPhoneVarify(phone) {
-  await prisma.user.update({
-  where: {phone: phone},
-  data : {phoneVarify : true}
-  })
+    await prisma.user.update({
+        where: { phone },
+        data: { phoneVarify: true },
+    });
 }
-async function getUserByPhone (phone){
-    const user = await prisma.user.findUnique({
-        where:  {
-            phone : phone 
-        }
-    })
-    return user
+
+async function getUserByPhone(phone) {
+    return prisma.user.findUnique({ where: { phone } });
 }
-async function getAllUsers () {
-    const user = await prisma.user.findMany()
-    const counter = user.length
-    return ({"users" : user, "number" : counter} )
+
+async function getAllUsers() {
+    const users = await prisma.user.findMany({
+        select: {
+            id: true,
+            full_name: true,
+            phone: true,
+            admin: true,
+            Blocked: true,
+            phoneVarify: true,
+        },
+        orderBy: { id: "asc" },
+    });
+    return { users, number: users.length };
 }
-async function isValid(pass, dpass) {
+
+// `data` must already be validated. A new password is hashed here so that no
+// caller can store it in plain text by mistake.
+async function updateUser(phone, data) {
+    const update = { ...data };
+    if (update.password) {
+        update.password = await hashPassword(update.password);
+    }
+    const updated = await prisma.user.update({
+        where: { phone },
+        data: update,
+    });
+    if (update.password) {
+        await revokeRefreshToken(phone);
+    }
+    return omitPassword(updated);
+}
+
+async function resetpass(phone, newPassword) {
+    return updateUser(phone, { password: newPassword });
+}
+
+async function getUserAnnounce(phone) {
+    return prisma.property.findMany({
+        where: { userID: phone },
+        orderBy: { id: "desc" },
+    });
+}
+
+function signAccessToken(phone) {
+    return JWT.sign({}, config.jwt.accessSecret, {
+        expiresIn: config.jwt.accessTtl,
+        issuer: config.jwt.issuer,
+        subject: phone,
+    });
+}
+
+async function signRefreshToken(phone) {
+    const token = JWT.sign({}, config.jwt.refreshSecret, {
+        expiresIn: config.jwt.refreshTtl,
+        issuer: config.jwt.issuer,
+        subject: phone,
+    });
+    const { exp } = JWT.decode(token);
+    const ttlSeconds = Math.max(exp - Math.floor(Date.now() / 1000), 1);
+    // Only the latest refresh token per user is valid.
+    await client.set(refreshKey(phone), token, { EX: ttlSeconds });
+    return token;
+}
+
+// Returns the phone number stored in a valid access token, or throws 401.
+function getUserByAccessToken(accessToken) {
     try {
-        // Return a promise that resolves with the result of bcrypt.compare
-        const data = await new Promise((resolve, reject) => {
-            bcrypt.compare(pass, dpass, (err, result) => {
-                if (err) {
-                    reject(err);  // Reject the promise if there's an error
-                } else {
-                    resolve(result);  // Resolve the promise with the comparison result
-                }
-            });
+        const payload = JWT.verify(accessToken, config.jwt.accessSecret, {
+            issuer: config.jwt.issuer,
         });
-        // Now you can return the boolean value based on the result of bcrypt.compare
-        if (data === true) {
-            return true;
-        } else {
-            return false;
-        }
-    } catch (error) {
-        throw error;
+        if (!payload.sub) throw new Error("missing subject");
+        return payload.sub;
+    } catch (err) {
+        throw createError.Unauthorized("Invalid or expired access token");
     }
 }
 
-async function updateUser (phone, result){
-  try {
-    console.log(phone)
-    const updated = await prisma.user.update({
-    where: {phone: phone},
-    data : result
-    })
-  return (updated)
-  } catch (error) {
-    if (error) return(error)
-  }
+// Returns the phone number stored in a valid, not revoked refresh token, or throws 401.
+async function verifyRefreshToken(refreshToken) {
+    let payload;
+    try {
+        payload = JWT.verify(refreshToken, config.jwt.refreshSecret, {
+            issuer: config.jwt.issuer,
+        });
+    } catch (err) {
+        if (err.name === "TokenExpiredError") {
+            throw createError.Unauthorized("Refresh token expired");
+        }
+        throw createError.Unauthorized("Invalid refresh token");
+    }
+    const phone = payload.sub;
+    const storedToken = phone ? await client.get(refreshKey(phone)) : null;
+    if (!storedToken || storedToken !== refreshToken) {
+        throw createError.Unauthorized("Refresh token is not valid anymore");
+    }
+    return phone;
 }
-async function resetpass (phone, new_pass){
-  try {
-    console.log(phone)
-    const updated = await prisma.user.update({
-    where: {phone: phone},
-    data : {password : new_pass}
-    })
-  return (updated)
-  } catch (error) {
-    if (error) return(error)
-  }
+
+async function revokeRefreshToken(phone) {
+    return client.del(refreshKey(phone));
 }
-async function getUserByAccessToken(accessToken) {
-  // Function to verify the access token and extract the user's phone number
-  return new Promise((resolve, reject) => {
-    JWT.verify(accessToken, "5b29b663001ba6bd03417dd8392d405a26a770b84b335628044b31ade046", (err, payload) => {
-      if (err) {
-        console.error("JWT verification error:", err.message);
-        return reject(createErrors.InternalServerError("Invalid or expired access token"));
-      }
-      const phone = payload?.aud?.toString();
-      if (!phone) {
-        return reject(createErrors.BadRequest("Token payload does not contain a valid audience (phone number)"));
-      }
-      resolve(phone);
-    });
-  });
-}
-async function getUserAnnounce(phone) {
-  const userAnnounces = await prisma.property.findMany(
-    {where : {
-      userID : phone
-    }}
-  )
-  return userAnnounces
-}
+
 module.exports = {
     doesExistphone,
     hashPassword,
@@ -128,53 +151,10 @@ module.exports = {
     updateUser,
     getUserByAccessToken,
     getUserAnnounce,
-    signRefreshToken: (phone) => {
-      return new Promise((resolve, reject) => {
-        const payload = {};
-        const secret = "80a3236d80c07f007bc56c5c30598a9ea4876f7bab2e69cc777e22f96ccead6a"     ;
-        const options = {
-          expiresIn: '1y',
-          issuer: 'pickurpage.com',
-          audience: phone,
-        };
-    
-        JWT.sign(payload, secret, options, async (err, token) => {
-          if (err) {
-            return reject(createErrors.InternalServerError());
-          }
-          try {
-            await connectRedis();
-            await client.set(phone, token, {
-              EX: 365 * 24 * 60 * 60,
-            });
-            resolve(token);
-          } catch (err) {
-            console.error('Error:', err);
-            reject(createError.InternalServerError());
-          } finally {
-            await disconnectRedis();
-          }
-        });
-      });
-    },
-    signAccessToken: (phone) => {
-        return new Promise((resolve, reject) => {
-          const payload = {}
-          const secret = "5b29b663001ba6bd03417dd8392d405a26a770b84b335628044b31ade046"
-          const options = {
-            expiresIn: '1y',
-            issuer: 'pickurpage.com',
-            audience: phone,
-          }
-          JWT.sign(payload, secret, options, (err, token) => {
-            if (err) {
-              reject(createErrors.InternalServerError())
-              return
-            }
-            resolve(token)
-          })
-        })
-      },
+    signRefreshToken,
+    signAccessToken,
+    verifyRefreshToken,
+    revokeRefreshToken,
     userPhoneVarify,
-    resetpass
-}
+    resetpass,
+};

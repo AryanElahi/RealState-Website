@@ -1,33 +1,27 @@
-const {PrismaClient} = require("@prisma/client")
-const prisma = new PrismaClient()
-const createErrors = require ("http-errors")
+const prisma = require("../../../loader/prisma");
 
-async function creatvisit(data){
-    const newvisit = await prisma.visit.create({
-        data :
-            data    
-    })
-    return newvisit
+async function creatvisit(data) {
+    return prisma.visit.create({ data });
 }
+
 async function getAllVisits() {
-    return (await prisma.visit.findMany())
+    return prisma.visit.findMany({ orderBy: { id: "desc" } });
 }
-async function updateVisits(Uid, data){
-    return await prisma.visit.update({
-    where: {Uid : Uid},
-    data : data
-    })
-    }
-async function deleteVisits (ID){
-      const updated = await prisma.visit.delete({
-      where: {Uid: ID}
-      })
-    return (updated)
-  }
+
+async function updateVisits(Uid, data) {
+    return prisma.visit.update({
+        where: { Uid },
+        data,
+    });
+}
+
+async function deleteVisits(Uid) {
+    return prisma.visit.delete({ where: { Uid } });
+}
 
 module.exports = {
     creatvisit,
     getAllVisits,
     updateVisits,
-    deleteVisits
-}
+    deleteVisits,
+};

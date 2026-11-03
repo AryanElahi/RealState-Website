@@ -1,33 +1,19 @@
-const {PrismaClient} = require("@prisma/client")
-const prisma = new PrismaClient()
-const createErrors = require ("http-errors")
+const prisma = require("../../../loader/prisma");
 
-async function creatregion(data){
-    const newregion = await prisma.region.create({
-        data :
-            data    
-    })
-    return newregion
+async function creatregion(data) {
+    return prisma.region.create({ data });
 }
+
 async function getAllregions() {
-    return (await prisma.region.findMany())
+    return prisma.region.findMany({ orderBy: { name: "asc" } });
 }
-//async function updateVisits(Uid, data){
-//    return await prisma.visit.update({
-//    where: {Uid : Uid},
-//    data : data
-//    })
-//    }
-async function deleteregion (id){
-      console.log(id)
-      const updated = await prisma.region.delete({
-      where: {id : id }
-      })
-    //return (updated)
-  }
+
+async function deleteregion(id) {
+    return prisma.region.delete({ where: { id } });
+}
 
 module.exports = {
     creatregion,
     getAllregions,
-    deleteregion
-}
+    deleteregion,
+};

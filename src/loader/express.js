@@ -1,37 +1,41 @@
 const express = require("express");
 const morgan = require("morgan");
-const cors = require("cors");  // اضافه کردن cors
-const createErrors = require("http-errors");
+const cors = require("cors");
+const helmet = require("helmet");
+const config = require("../config");
 const routes = require("../api/routes");
-require("dotenv").config();
-const { save_visitor } = require("./../services/adminpanel/visitCountingServices");
-const { errorHandler, notFoundHandler } = require("./../api/middlewares/errorHandeler");
-const path = require('path');
+const { save_visitor } = require("../services/adminpanel/visitCountingServices");
+const { errorHandler, notFoundHandler } = require("../api/middlewares/errorHandler");
+const { apiLimiter } = require("../api/middlewares/rateLimit");
+const asyncHandler = require("../utils/asyncHandler");
 
-const expressLoader = async (app) => {
+const expressLoader = (app) => {
+    if (config.trustProxy) {
+        // Needed behind nginx so req.ip (rate limit, visitor counting) is the real client IP.
+        app.set("trust proxy", 1);
+    }
+    app.disable("x-powered-by");
+    app.use(helmet({ crossOriginResourcePolicy: { policy: "cross-origin" } }));
     app.use(cors({
-        origin: '*',
-        methods: ['GET', 'POST', 'PUT', 'DELETE'],
-        allowedHeaders: ['Content-Type', 'Authorization'],
+        origin: config.corsOrigin,
+        methods: ["GET", "POST", "PUT", "DELETE"],
+        allowedHeaders: ["Content-Type", "Authorization"],
     }));
-    app.use(morgan("dev"));
-    app.use(express.json());
-    app.use(express.urlencoded({ extended: true }));
-    const photosPath = '/var/www/backend/zhinga_deployed_version/src/photos';
-    app.use('/photos', express.static(photosPath));
-    app.get("/", async (req, res, next) => {
+    app.use(morgan(config.isProduction ? "combined" : "dev"));
+    app.use(express.json({ limit: "1mb" }));
+    app.use(express.urlencoded({ extended: true, limit: "1mb" }));
+    app.use("/photos", express.static(config.photosDir, { dotfiles: "deny", index: false }));
+
+    app.get("/", asyncHandler(async (req, res) => {
         await save_visitor(req);
         res.send("Home Rout");
-    });
+    }));
 
-    app.use("/api", routes());
+    app.use("/api", apiLimiter, routes());
     app.use(notFoundHandler);
     app.use(errorHandler);
 
-    app.listen(3000, () => {
-        console.log(`Server is running on port 3000`);
-    });
+    return app;
 };
 
 module.exports = expressLoader;
-   

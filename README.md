@@ -24,12 +24,27 @@ This API is designed to support sophisticated real estate processes, emphasizing
 
 | Area | Technology Used | Rationale for Selection |
 | :--- | :--- | :--- |
-| **Language & Framework** | **[Your Language/Framework, e.g., Node.js/Express, Python/Django]** | Chosen for its high performance, scalability, and suitability for rapid API development. |
-| **Database (DB)** | **[Your Database, e.g., PostgreSQL, MongoDB]** | Selected for reliability, transactional support, and efficient management of structured property data. |
+| **Language & Framework** | **Node.js / Express** | Chosen for its high performance, scalability, and suitability for rapid API development. |
+| **Database (DB)** | **PostgreSQL with Prisma, Redis for tokens and verification codes** | Selected for reliability, transactional support, and efficient management of structured property data. |
 | **Authentication** | **JWT (JSON Web Tokens)** | Industry standard for secure, stateless authentication, which is essential for a modern, scalable RESTful API. |
-| **Testing** | [Your Testing Framework, e.g., Jest, Pytest] | Ensures API reliability and prevents regressions in business logic. |
 
 ***
+
+## 🚀 Running the API
+
+Requirements: Node.js 18+, PostgreSQL and Redis.
+
+```bash
+npm install
+cp .env.example .env   # then fill in the values
+npm run prisma:migrate
+npm run prisma:generate
+npm start              # or: npm run dev
+```
+
+All secrets (JWT secrets, SMS.ir credentials, database URL) are read from `.env`, which must never be committed. See `.env.example` for every setting.
+
+Authentication: `/auth/login` returns a short-lived access token and a refresh token. Send `{ "refreshToken": "..." }` to `POST /api/V1/auth/refresh` to get a new pair; the old refresh token stops working.
 
 ## 📑 API Documentation (Endpoints)
 
@@ -43,6 +58,7 @@ All API routes are organized in a clear RESTful structure, as extracted from the
 | :--- | :--- | :--- |
 | `POST` | `/api/V1/auth/register` | Register a new user. |
 | `POST` | `/api/V1/auth/login` | User login and token issuance. |
+| `POST` | `/api/V1/auth/refresh` | Exchange a refresh token for new tokens. |
 | `POST` | `/api/V1/auth/verify` | Verify the user's phone number. |
 | `PUT` | `/api/V1/auth/updateuser` | Update user profile information. |
 
@@ -53,7 +69,7 @@ All API routes are organized in a clear RESTful structure, as extracted from the
 | `POST` | `/api/V1/announce/creatAnnounce` | Create a new property listing (requires authentication). |
 | `GET` | `/api/V1/announce/getallannounce` | Retrieve all confirmed listings. |
 | `POST` | `/api/V1/announce/search` | Search using advanced filters. |
-| `POST` | `/apiV1/announce/uploadPhotos` | Upload and attach images to a listing. |
+| `POST` | `/api/V1/announce/uploadPhotos` | Upload and attach images to a listing. |
 | `DELETE` | `/api/V1/announce/hdelete` | Delete a listing. |
 
 ### C. Viewing Requests and Booking
@@ -69,7 +85,7 @@ All API routes are organized in a clear RESTful structure, as extracted from the
 | HTTP Method | Endpoint | Description |
 | :--- | :--- | :--- |
 | `POST` | `/api/V1/admin/varifyannounce` | Verify and publish a listing. |
-| `POST` | `api/V1/admin/creatVisit` | Log a new visit in the work calendar. |
+| `POST` | `/api/V1/admin/creatVisit` | Log a new visit in the work calendar. |
 | `GET` | `/api/V1/admin/notconfirmedannouncements` | Retrieve listings awaiting admin confirmation. |
 | `PUT` | `/api/V1/admin/promotToAdmin` | Elevate a user's role to Admin. |
 

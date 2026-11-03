@@ -1,64 +1,52 @@
-const express = require("express")
-const router = express.Router()
-const createError = require("http-errors")
-const {request} = require("../../../../validation/request.validation")
-const {verifyAccessToken, verifyadmin} = require("../../../middlewares/isAuth.middleware")
-const { 
+const express = require("express");
+const createError = require("http-errors");
+const asyncHandler = require("../../../../utils/asyncHandler");
+const validate = require("../../../../utils/validate");
+const { generateUid } = require("../../../../utils/uid");
+const { request, uidOnly } = require("../../../../validation/request.validation");
+const { verifyAccessToken, verifyadmin } = require("../../../middlewares/isAuth.middleware");
+const { authLimiter } = require("../../../middlewares/rateLimit");
+const {
     creatRequest,
-    getByUid, 
+    getByUid,
     getAll,
     getchecked,
     getunchecked,
-    check
-} = require("../../../../services/request/services")
+    check,
+} = require("../../../../services/request/services");
 
-router.post("/creatrequest", async (req, res, next) => {
-    try {
-        let result = await request.validateAsync(req.body) 
-        console.log("aksljd") 
-        result.Uid = String(new Date().getTime()) 
-        const  newA = await creatRequest(result)
-        res.send("request has been recived")        
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.get("/getAll",verifyAccessToken, verifyadmin , async (req, res, next) => {
-    try {
-        res.send(await getAll())
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.get("/getchecked",verifyAccessToken, verifyadmin , async (req, res, next) => {
-    try {
-        res.send(await getchecked())        
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.get("/getunchecked",verifyAccessToken, verifyadmin , async (req, res, next) => {
-    try {
-        res.send(await getunchecked())        
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.post("/getbyUid",verifyAccessToken, verifyadmin , async (req, res, next) => {
-    try {
-        const Uid = req.body.Uid
-        res.send(await getByUid(Uid))        
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.put("/check",verifyAccessToken, verifyadmin , async (req, res, next) => {
-    try {
-        res.send (await check(req.body.Uid))        
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
+const router = express.Router();
+const adminOnly = [verifyAccessToken, verifyadmin];
 
-})
+router.post("/creatrequest", authLimiter, asyncHandler(async (req, res) => {
+    const result = await validate(request, req.body);
+    result.Uid = generateUid();
+    await creatRequest(result);
+    res.send("request has been recived");
+}));
 
-module.exports = router
+router.get("/getAll", adminOnly, asyncHandler(async (req, res) => {
+    res.send(await getAll());
+}));
+
+router.get("/getchecked", adminOnly, asyncHandler(async (req, res) => {
+    res.send(await getchecked());
+}));
+
+router.get("/getunchecked", adminOnly, asyncHandler(async (req, res) => {
+    res.send(await getunchecked());
+}));
+
+router.post("/getbyUid", adminOnly, asyncHandler(async (req, res) => {
+    const { Uid } = await validate(uidOnly, req.body);
+    const found = await getByUid(Uid);
+    if (!found) throw createError.NotFound("request not found");
+    res.send(found);
+}));
+
+router.put("/check", adminOnly, asyncHandler(async (req, res) => {
+    const { Uid } = await validate(uidOnly, req.body);
+    res.send(await check(Uid));
+}));
+
+module.exports = router;

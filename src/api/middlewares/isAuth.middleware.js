@@ -1,74 +1,54 @@
-const JWT = require("jsonwebtoken")
-const createError = require("http-errors")
-const { process } = require("@hapi/joi/lib/errors")
-const env = require("dotenv")
-const { reject } = require("bcrypt/promises")
-const { client, connectRedis, disconnectRedis } = require("./../../loader/redis")
-const {getUserByAccessToken, getUserByPhone} = require("../../services/user/auth")
-const { HttpStatusCode } = require("axios")
+const createError = require("http-errors");
+const { getUserByAccessToken, getUserByPhone } = require("../../services/user/auth");
+const { omitPassword } = require("../../utils/sanitize");
 
+const getBearerToken = (req) => {
+    const header = req.headers["authorization"] || "";
+    const [scheme, token] = header.split(" ");
+    if (scheme !== "Bearer" || !token) return null;
+    return token;
+};
+
+const loadUser = async (token) => {
+    const phone = getUserByAccessToken(token);
+    const user = await getUserByPhone(phone);
+    if (!user) throw createError.Unauthorized("User not found");
+    if (user.Blocked) throw createError.Forbidden("This account has been blocked");
+    return omitPassword(user);
+};
 
 module.exports = {
-    verifyAccessToken: (req, res, next) => {
-        if (!req.headers["authorization"]) next (createError.Unauthorized())
-        const authheader = req.headers["authorization"]
-        const bearertoken = authheader.split(' ')
-        const token = bearertoken[1]
-        JWT.verify(token, "5b29b663001ba6bd03417dd8392d405a26a770b84b335628044b31ade046"
-          , (err, payload) => {
-            if (err) {return next (createError.Unauthorized())}
-            req.payload = payload
-            next()
-        })
-    },
-    verifyadmin: async (req, res, next) => {
-      if (!req.headers["authorization"]) next (createError.Unauthorized())
-        const authheader = req.headers["authorization"]
-        const bearertoken = authheader.split(' ')
-        const token = bearertoken[1]
-        const userId = await getUserByAccessToken(token)
-        const user = await getUserByPhone(userId)
-        if (user.admin === true) {
-          next();  
-      } else {
-          return res.status(403).json({ message: 'Access denied: Admins only' });
-      }
-  },
-  verifyRefreshToken: (refreshToken) => {
-    return new Promise((resolve, reject) => {
-      // Verify the JWT token
-      JWT.verify(refreshToken, "80a3236d80c07f007bc56c5c30598a9ea4876f7bab2e69cc777e22f96ccead6a" , async (err, payload) => {
-        if (err) {
-          console.error('JWT Verification Error:', err);  // Debugging log for JWT errors
-          if (err.name === 'TokenExpiredError') {
-            return reject(createError.Unauthorized('Refresh token expired'));
-          } else {
-            return reject(createError.Unauthorized('Invalid refresh token'));
-          }
-        }
-  
-        const phone = payload.aud;  
+    // Requires a valid access token. Sets req.user (without the password hash).
+    verifyAccessToken: async (req, res, next) => {
         try {
-          // Connect to Redis
-          await connectRedis();  
-          // Attempt to retrieve the stored token associated with the phone
-          const storedToken = await client.get(phone);  
-          // Check if the stored token matches the provided refresh token
-          if (!storedToken) {
-            console.error('Stored token not found in Redis for phone:', phone);
-            return reject(createError.Unauthorized('Token not found'));
-          }
-          if (storedToken !== refreshToken) {
-            console.error('Token mismatch: provided token does not match stored token');
-            return reject(createError.Unauthorized('Token mismatch'));
-          }
-          await disconnectRedis();
-          resolve(phone);
-        } catch (redisErr) {
-          console.error('Redis operation error:', redisErr);  // Log Redis-specific error
-          reject(createError.InternalServerError('Redis error occurred'));
+            const token = getBearerToken(req);
+            if (!token) return next(createError.Unauthorized());
+            req.user = await loadUser(token);
+            req.payload = { aud: req.user.phone, sub: req.user.phone };
+            return next();
+        } catch (err) {
+            return next(err);
         }
-      });
-    });
-  }, 
-  }
+    },
+
+    // Same as verifyAccessToken, but lets anonymous requests through.
+    // An invalid token is still rejected.
+    optionalAuth: async (req, res, next) => {
+        try {
+            const token = getBearerToken(req);
+            if (token) req.user = await loadUser(token);
+            return next();
+        } catch (err) {
+            return next(err);
+        }
+    },
+
+    // Must be used after verifyAccessToken.
+    verifyadmin: (req, res, next) => {
+        if (!req.user) return next(createError.Unauthorized());
+        if (req.user.admin !== true) {
+            return next(createError.Forbidden("Access denied: Admins only"));
+        }
+        return next();
+    },
+};

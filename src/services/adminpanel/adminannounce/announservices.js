@@ -1,113 +1,94 @@
-const {PrismaClient} = require("@prisma/client")
-const prisma = new PrismaClient()
+const prisma = require("../../../loader/prisma");
+const { buildWhere } = require("../../../validation/search.validation");
 
-async function creatannounce (data, userId){
-    data.userID = userId
-    const newAnnoun = await prisma.property.create({
-        data :
-            data    
-    })
-    return newAnnoun
+async function creatannounce(data, userId) {
+    return prisma.property.create({
+        data: { ...data, userID: userId },
+    });
 }
-async function getAllAnnouns () {
+
+async function getAllAnnouns() {
     const announs = await prisma.property.findMany({
-        orderBy: {
-            id: 'desc'
-        }
-    })
-    const counter = announs.length
-    return ({"announce": announs, "number": counter})
+        orderBy: { id: "desc" },
+    });
+    return { announce: announs, number: announs.length };
 }
+
 async function inPrigressStates() {
     const announs = await prisma.property.findMany({
-        where : {check : false}
-    })
-    const count = announs.length
-    return ({"inprogress": announs, "number": count})
+        where: { check: false, reject: false },
+        orderBy: { id: "desc" },
+    });
+    return { inprogress: announs, number: announs.length };
 }
-async function deleted_or_not_confirmed (){
+
+async function deleted_or_not_confirmed() {
     const announs = await prisma.property.findMany({
-        where : {reject : true}
-    })
-    const count = announs.length
-    return ({"deleted": announs, "number": count})
+        where: { reject: true },
+        orderBy: { id: "desc" },
+    });
+    return { deleted: announs, number: announs.length };
 }
-async function updateAnnoun (result){
-    const code = await getByUid(result.Uid)
-    return await prisma.property.update({
-    where: {Uid : code.Uid},
-    data : result
-    })
-}
-async function delete_photos (uid){
-    return await prisma.property.update({
-    where: {Uid :uid},
-    data : { photo: [] }
-    })
-}
-async function search(data) {
-  const { full_name, address, price, ...rest } = data;
 
-  const where = {
-    ...rest,
-    ...(full_name && {
-      full_name: {
-        contains: full_name,
-        mode: 'insensitive'
-      }
-    }),
-    ...(address && {
-      address: {
-        contains: address,
-        mode: 'insensitive'
-      }
-    }),
-    ...(price && {
-      price: {
-        lte: price
-      }
-    })
-  };
-
-  const user_announs = await prisma.property.findMany({
-    where
-  });
-
-  return user_announs;
+async function updateAnnoun({ Uid, ...data }) {
+    return prisma.property.update({
+        where: { Uid },
+        data,
+    });
 }
-async function getByUid (code) {
+
+async function delete_photos(Uid) {
+    return prisma.property.update({
+        where: { Uid },
+        data: { photo: [] },
+    });
+}
+
+// `filters` must come from search.validation (whitelisted fields only).
+async function search(filters) {
+    return prisma.property.findMany({
+        where: buildWhere(filters),
+        orderBy: { id: "desc" },
+    });
+}
+
+async function getByUid(Uid) {
     return prisma.property.findUnique({
-        where: {
-            Uid : code
-        }
-    })
+        where: { Uid },
+    });
 }
+
+// Appends photos to an announcement.
 async function photo_adding(Uid, newUrls) {
-    const existing = await prisma.property.findUnique({
+    const existing = await prisma.property.findUniqueOrThrow({
         where: { Uid },
-        select: { photo: true }
+        select: { photo: true },
     });
-
     const currentPhotos = Array.isArray(existing.photo) ? existing.photo : [];
-    const updatedPhotos = [...currentPhotos, ...newUrls];
-
-    return await prisma.property.update({
+    return prisma.property.update({
         where: { Uid },
-        data: { photo: updatedPhotos }
+        data: { photo: [...currentPhotos, ...newUrls] },
     });
 }
-async function checkAnnounce (ID, stateCode){
-      const updated = await prisma.property.update({
-      where: {Uid: ID},
-      data : {check : true,
-            state_code : stateCode
-      }
-      })
-    return (updated)
+
+async function checkAnnounce(Uid, stateCode) {
+    return prisma.property.update({
+        where: { Uid },
+        data: {
+            check: true,
+            reject: false,
+            state_code: stateCode,
+        },
+    });
 }
-async function rejectAnnoun(ID){
-    const updated = await prisma.property.delete({
-    where: {Uid: ID}    })
+
+// Marks the announcement as rejected instead of deleting it, so it shows up
+// in the "deleted or not confirmed" list of the admin panel.
+async function rejectAnnoun(Uid) {
+    return prisma.property.update({
+        where: { Uid },
+        data: { reject: true, check: false },
+    });
 }
 
 module.exports = {
@@ -117,9 +98,9 @@ module.exports = {
     deleted_or_not_confirmed,
     search,
     checkAnnounce,
-    rejectAnnoun, 
-    updateAnnoun ,
+    rejectAnnoun,
+    updateAnnoun,
     photo_adding,
     getByUid,
-    delete_photos
-}
+    delete_photos,
+};

@@ -1,142 +1,101 @@
-const express = require("express")
-const router = express.Router()
-const createError = require("http-errors")
-const {creat, update} = require("../../../../validation/announce.crud.validation")
-const upload = require('./../../../middlewares/photoUploading'); 
-
-const { 
+const express = require("express");
+const createError = require("http-errors");
+const asyncHandler = require("../../../../utils/asyncHandler");
+const validate = require("../../../../utils/validate");
+const { generateUid } = require("../../../../utils/uid");
+const { creat, uidOnly, regionName } = require("../../../../validation/announce.crud.validation");
+const { publicSearch } = require("../../../../validation/search.validation");
+const { upload, removeUploadedFiles, fileUrl } = require("../../../middlewares/photoUploading");
+const { verifyAccessToken, optionalAuth } = require("../../../middlewares/isAuth.middleware");
+const {
     creatAnnouncement,
-    getByStateCode,
     getAllAnnouns,
     getByUid,
-    updateAnnoun,
     confirmed,
     deleteAnnoun,
     photo_adding,
     search,
-    searchregion
-} = require("../../../../services/anouncement/CRUD")
-const {getUserByAccessToken} = require ("./../../../../services/user/auth")
-const {verifyAccessToken} = require("../../../middlewares/isAuth.middleware")
-const {
-    getAllregions,
-} = require("../../../../services/adminpanel/region/CRUD")
-    router.post ("/creatAnnounce", verifyAccessToken , async (req, res, next) => {
-    try {
-        let result = await creat.validateAsync(req.body)
-        const authheader = req.headers["authorization"]
-        const bearertoken = authheader.split(' ')
-        const token = bearertoken[1]
-        const userId = await getUserByAccessToken(token)
-        result.Uid = String(new Date().getTime()) 
-        const  newA = await creatAnnouncement(result, userId)
-        const message = "announcement has been created:"
-        console.log(newA)
-        res.send({message, newA})
-    } catch (error) {
-        console.log(error)
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.post("/uploadPhotos",verifyAccessToken , async (req, res, next) => {
-    try {
-        upload(req, res, async (err) => { 
-            if (err) {
-                return res.status(400).json({
-                    success: 0,
-                    message: err.message
-                });
-            }
-            if (!req.files || req.files.length === 0) {
-                return res.status(400).json({
-                    success: 0,
-                    message: 'file doesnt exist'
-                });
-            }
-            const imageUrls = req.files.map(file => `http://185.231.115.236:3000/photos/${file.filename}`);
-            try {
-                const adding = await photo_adding(req.body.Uid, imageUrls)
-                res.status(200).json({
-                    success: 1,
-                    message: "success",
-                    files: imageUrls
-                });
-            } catch (error) {
-                console.error(error);
-                res.status(500).json({
-                    success: 0,
-                    message: "error while uploading"
-                });
-            }
-        });        
-    } catch (error) {
-        console.log(error)
-        next(createError(500, "An unexpected error occurred"));
-    }
-});
-router.get("/getallannounce" , async (req, res, next) => {
-    try {
-        res.send(await getAllAnnouns())        
-    } catch (error) {
-        console.log(error)
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.post("/search" , async (req, res, next) => {
-    try {
-        const result = await search(req.body)
-        res.send(result)        
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.post("/getbyUid" , async (req, res, next) => {
-    try {
-        const Uid = req.body.Uid
-        res.send(await getByUid(Uid))        
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.delete("/hdelete",verifyAccessToken , async (req, res, next) => {
-    try {
-        const Uid = req.body.Uid
-        const delet = await deleteAnnoun(Uid)
-        res.send ("the annonce has been deleted")        
-    } catch (error) {
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.get("/getAllregions", async(req, res, next) => {
-    try {
-        const regions = await getAllregions()
-        console.log(regions)
-        res.send(regions)        
-    } catch (error) {
-        console.log(error)
-        next(createError(500, "An unexpected error occurred"));
-    }
-})
-router.get("/confirmed_announce", async (req, res, next) => {
-    try {
-        const confirm = await confirmed()
-        res.send(confirm)
-    } 
-    catch (error) {
-        console.log(error)
-        next(createError(500, "An unexpected error occurred"));
-    }
-});
-router.post("/search_region", async (req, res, next) => {
-    try {
-        const result = await searchregion(req.body.name)
-        res.send(result)
-    } 
-    catch (error) {
-        console.log(error)
-        next(createError(500, "An unexpected error occurred"));
-    }
-});
-module.exports = router
+    searchregion,
+} = require("../../../../services/anouncement/CRUD");
+const { getAllregions } = require("../../../../services/adminpanel/region/CRUD");
 
+const router = express.Router();
 
+const canManage = (user, announcement) =>
+    Boolean(user) && (user.admin === true || announcement.userID === user.phone);
+
+router.post("/creatAnnounce", verifyAccessToken, asyncHandler(async (req, res) => {
+    const result = await validate(creat, req.body);
+    result.Uid = generateUid();
+    const newA = await creatAnnouncement(result, req.user.phone);
+    res.send({ message: "announcement has been created:", newA });
+}));
+
+// Only the owner of the announcement (or an admin) can change its photos.
+router.post("/uploadPhotos", verifyAccessToken, upload, asyncHandler(async (req, res) => {
+    try {
+        const { Uid } = await validate(uidOnly, req.body);
+        const announcement = await getByUid(Uid);
+        if (!announcement) throw createError.NotFound("announcement not found");
+        if (!canManage(req.user, announcement)) {
+            throw createError.Forbidden("You can only change your own announcements");
+        }
+        const imageUrls = req.files.map(fileUrl);
+        await photo_adding(Uid, imageUrls);
+        res.status(200).json({
+            success: 1,
+            message: "success",
+            files: imageUrls,
+        });
+    } catch (err) {
+        await removeUploadedFiles(req.files);
+        throw err;
+    }
+}));
+
+router.get("/getallannounce", asyncHandler(async (req, res) => {
+    res.send(await getAllAnnouns());
+}));
+
+router.post("/search", asyncHandler(async (req, res) => {
+    const filters = await validate(publicSearch, req.body);
+    res.send(await search(filters));
+}));
+
+// Approved announcements are public. Pending or rejected ones are only
+// visible to their owner and to admins.
+router.post("/getbyUid", optionalAuth, asyncHandler(async (req, res) => {
+    const { Uid } = await validate(uidOnly, req.body);
+    const announcement = await getByUid(Uid);
+    const isPublic = announcement && announcement.check && !announcement.reject;
+    if (!announcement || (!isPublic && !canManage(req.user, announcement))) {
+        throw createError.NotFound("announcement not found");
+    }
+    res.send(announcement);
+}));
+
+router.delete("/hdelete", verifyAccessToken, asyncHandler(async (req, res) => {
+    const { Uid } = await validate(uidOnly, req.body);
+    const announcement = await getByUid(Uid);
+    if (!announcement) throw createError.NotFound("announcement not found");
+    if (!canManage(req.user, announcement)) {
+        throw createError.Forbidden("You can only delete your own announcements");
+    }
+    await deleteAnnoun(Uid);
+    res.send("the annonce has been deleted");
+}));
+
+router.get("/getAllregions", asyncHandler(async (req, res) => {
+    res.send(await getAllregions());
+}));
+
+router.get("/confirmed_announce", asyncHandler(async (req, res) => {
+    res.send(await confirmed());
+}));
+
+router.post("/search_region", asyncHandler(async (req, res) => {
+    const { name } = await validate(regionName, req.body);
+    res.send(await searchregion(name));
+}));
+
+module.exports = router;

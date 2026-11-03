@@ -1,44 +1,35 @@
-const requestIp = require('request-ip')
-const {PrismaClient} = require("@prisma/client")
-const prisma = new PrismaClient()
+const requestIp = require("request-ip");
+const prisma = require("../../loader/prisma");
 
-async function get_exact_date(){
-    let ts = Date.now();
-    let date_time = new Date(ts);
-    let date = date_time.getDate();
-    let month = date_time.getMonth() + 1;
-    let year = date_time.getFullYear();
-    const final = (year + "-" + month + "-" + date);
-    return (final)
+// Kept in the same "YYYY-M-D" format as existing rows.
+function get_exact_date() {
+    const now = new Date();
+    return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
-async function get_ip (req){
-    const clientIp = requestIp.getClientIp(req)
-    return clientIp
-}
-async function save_visitor (req) {
-    const date = await get_exact_date()
-    const ip = await get_ip(req)
-    const data = {"date": date, "ip": ip}
-    const visitor = await prisma.visitor.create({
-        data : data
-    })
-    return visitor
-}
-async function get_daily_visitors () {
-    const date = await get_exact_date()
-    const visitors = await prisma.visitor.findMany({
-        where : {
-            date : date
-        }
-    })
-    const number = visitors.length
-    return number
 
+function get_ip(req) {
+    return requestIp.getClientIp(req) || req.ip || "";
 }
-async function get_all_visitors (){
-    const visitor = await prisma.visitor.findMany()
-    const number = visitor.length
-    return ({"visitor": visitor, "number": number})
+
+async function save_visitor(req) {
+    return prisma.visitor.create({
+        data: { date: get_exact_date(), ip: get_ip(req) },
+    });
+}
+
+async function get_daily_visitors() {
+    return prisma.visitor.count({
+        where: { date: get_exact_date() },
+    });
+}
+
+async function get_all_visitors() {
+    const visitor = await prisma.visitor.findMany();
+    return { visitor, number: visitor.length };
+}
+
+async function count_all_visitors() {
+    return prisma.visitor.count();
 }
 
 module.exports = {
@@ -46,5 +37,6 @@ module.exports = {
     get_exact_date,
     save_visitor,
     get_daily_visitors,
-    get_all_visitors
-}
+    get_all_visitors,
+    count_all_visitors,
+};

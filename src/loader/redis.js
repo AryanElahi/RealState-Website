@@ -1,31 +1,31 @@
-require("dotenv").config()
+const { createClient } = require("redis");
+const config = require("../config");
 
-const redis = require('redis');
+// One long-lived connection, opened at startup and closed on shutdown.
+// Do not connect/disconnect per request: concurrent requests would close
+// the connection under each other.
+const client = createClient({ url: config.redisUrl });
 
-const client = redis.createClient({
-    url: 'redis://127.0.0.1:6379'
-});
-
-client.on('error', (err) => {
-    console.log('Redis Client Error', err);
+client.on("error", (err) => {
+    console.error("Redis Client Error", err);
 });
 
 const connectRedis = async () => {
     if (!client.isOpen) {
-        console.log("redis has been connected");
         await client.connect();
+        console.log("Redis connected");
     }
 };
 
 const disconnectRedis = async () => {
     if (client.isOpen) {
         await client.quit();
-        console.log("redis has been disconnected");
+        console.log("Redis disconnected");
     }
 };
 
 module.exports = {
     client,
     connectRedis,
-    disconnectRedis
+    disconnectRedis,
 };
